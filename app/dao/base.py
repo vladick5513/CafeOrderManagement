@@ -1,4 +1,4 @@
-from sqlalchemy import select, update as sqlalchemy_update, delete as sqlalchemy_delete
+from sqlalchemy import select, update as sqlalchemy_update, delete as sqlalchemy_delete, func
 from sqlalchemy.exc import SQLAlchemyError
 from app.database import async_session_factory
 
@@ -11,15 +11,11 @@ class BaseDAO:
         async with async_session_factory() as session:
             query = select(cls.model).filter_by(id=data_id)
             result = await session.execute(query)
-            return result.scalar_one_or_none()
+            order = result.scalar_one_or_none()
+            if order:
+                return order.to_dict()  # Используем to_dict
+            return None
 
-    @classmethod
-    async def find_one_or_none(cls, filter_by):
-        """Поиск одной записи по произвольным параметрам"""
-        async with async_session_factory() as session:
-            query = select(cls.model).filter_by(**filter_by)
-            result = await session.execute(query)
-            return result.scalar_one_or_none()
 
     @classmethod
     async def find_all(cls, **filter_by):
@@ -27,7 +23,9 @@ class BaseDAO:
         async with async_session_factory() as session:
             query = select(cls.model).filter_by(**filter_by)
             result = await session.execute(query)
-            return result.scalars().all()
+            orders = result.scalars().all()
+            return [order.to_dict() for order in orders]  # Используем to_dict
+
 
     @classmethod
     async def add(cls, **values):
@@ -36,42 +34,31 @@ class BaseDAO:
         Для заказов: автоматически вычисляет общую стоимость и устанавливает статус "в ожидании"
         """
         async with async_session_factory() as session:
-            async with session.begin():
-                if cls.model.__tablename__ == 'orders':
-                    # Вычисляем общую стоимость для заказов
-                    if 'items' in values:
-                        values['total_price'] = sum(item['price'] for item in values['items'])
-                    values['status'] = 'в ожидании'  # Устанавливаем начальный статус
+            if cls.model.__tablename__ == 'orders':
+                # Вычисляем общую стоимость для заказов
+                if 'items' in values:
+                    values['total_price'] = sum(item['price'] for item in values['items'])
+                values['status'] = 'в ожидании'  # Устанавливаем начальный статус
 
-                new_instance = cls.model(**values)
-                session.add(new_instance)
-                try:
-                    await session.commit()
-                except SQLAlchemyError as e:
-                    await session.rollback()
-                    raise e
-                return new_instance
+            new_instance = cls.model(**values)
+            session.add(new_instance)
+            try:
+                await session.commit()
+                # Получаем свежие данные из базы
+                await session.refresh(new_instance)
+                # Преобразуем SQLAlchemy модель в словарь
+                return {
+                    "id": new_instance.id,
+                    "table_number": new_instance.table_number,
+                    "items": new_instance.items,
+                    "total_price": new_instance.total_price,
+                    "status": new_instance.status
+                }
+            except SQLAlchemyError as e:
+                await session.rollback()
+                raise e
 
-    @classmethod
-    async def add_many(cls, instance: list[dict]):
-        """Добавление нескольких записей одновременно"""
-        async with async_session_factory() as session:
-            async with session.begin():
-                if cls.model.__tablename__ == 'orders':
-                    # Обрабатываем каждый заказ
-                    for item in instance:
-                        if 'items' in item:
-                            item['total_price'] = sum(i['price'] for i in item['items'])
-                        item['status'] = 'в ожидании'
 
-                new_instance = [cls.model(**values) for values in instance]
-                session.add_all(new_instance)
-                try:
-                    await session.commit()
-                except SQLAlchemyError as e:
-                    await session.rollback()
-                    raise e
-                return new_instance
 
     @classmethod
     async def update(cls, filter_by, **values):
@@ -128,7 +115,10 @@ class BaseDAO:
         async with async_session_factory() as session:
             query = select(cls.model).filter_by(table_number=table_number)
             result = await session.execute(query)
-            return result.scalars().all()
+            orders = result.scalars().all()
+            return [order.to_dict() for order in orders]  # Используем to_dict
+
+
 
     @classmethod
     async def find_by_status(cls, status: str):
@@ -136,7 +126,9 @@ class BaseDAO:
         async with async_session_factory() as session:
             query = select(cls.model).filter_by(status=status)
             result = await session.execute(query)
-            return result.scalars().all()
+            orders = result.scalars().all()
+            return [order.to_dict() for order in orders]  # Используем to_dict
+
 
     @classmethod
     async def update_status(cls, order_id: int, new_status: str):
@@ -151,4 +143,26 @@ class BaseDAO:
         async with async_session_factory() as session:
             query = select(cls.model).order_by(cls.model.id)
             result = await session.execute(query)
-            return result.scalars().all()
+            orders = result.scalars().all()
+            return [order.to_dict() for order in orders]  # Используем to_dict
+
+
+    @classmethod
+    async def calculate_revenue(cls):
+        """
+        Расчет общей выручки по оплаченным заказам
+        Returns:
+            float: Общая сумма выручки по оплаченным заказам
+        """
+        async with async_session_factory() as session:
+            try:
+                # Выбираем все заказы со статусом "оплачено" и суммируем их total_price
+                query = (
+                    select(func.sum(cls.model.total_price))
+                    .where(cls.model.status == "оплачено")
+                )
+                result = await session.execute(query)
+                total_revenue = result.scalar() or 0.0  # Если нет заказов, возвращаем 0
+                return total_revenue
+            except SQLAlchemyError as e:
+                raise e
