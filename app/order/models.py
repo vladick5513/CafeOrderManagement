@@ -13,3 +13,13 @@ class Order(Base):
     items = Column(JSON, nullable=False)  # Список блюд с ценами
     total_price = Column(Float, nullable=False)
     status = Column(String, nullable=False, default=OrderStatus.PENDING)
+
+    def to_dict(self):
+        """Преобразует SQLAlchemy модель в словарь."""
+        return {
+            "id": self.id,
+            "table_number": self.table_number,
+            "items": self.items,
+            "total_price": self.total_price,
+            "status": self.status
+        }
