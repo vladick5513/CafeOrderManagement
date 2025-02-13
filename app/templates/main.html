@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление заказами</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/pages">Система заказов</a>
+            <div class="navbar-nav">
+                <a class="nav-link" href="/pages">Все заказы</a>
+                <a class="nav-link" href="/pages/add">Добавить заказ</a>
+                <a class="nav-link" href="/pages/search">Поиск</a>
+                <a class="nav-link" href="/pages/revenue">Выручка</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2>Список заказов</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Стол</th>
+                    <th>Блюда и цены</th>
+                    <th>Общая стоимость</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td>{{ order.id }}</td>
+                    <td>{{ order.table_number }}</td>
+                    <td>
+                        {% if order.dishes %}
+                            <ul class="list-unstyled">
+                            {% for dish in order.dishes %}
+                                <li>{{ dish.name }} - {{ dish.price }} ₽</li>
+                            {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </td>
+                    <td>{{ order.total_amount }} ₽</td>
+                    <td>{{ order.status }}</td>
+                    <td>
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#statusModal{{ order.id }}">
+                                Изменить статус
+                            </button>
+                            <form action="/orders/delete/{{ order.id }}" method="POST" style="display: inline;">
+                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Удалить заказ?')">Удалить</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Модальные окна для изменения статуса -->
+    {% for order in orders %}
+    <div class="modal fade" id="statusModal{{ order.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Изменить статус заказа #{{ order.id }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="/orders/update_status/{{ order.id }}" method="POST">
+                        <select name="status" class="form-select">
+                            <option value="в ожидании">В ожидании</option>
+                            <option value="готово">Готово</option>
+                            <option value="оплачено">Оплачено</option>
+                        </select>
+                        <button type="submit" class="btn btn-primary mt-3">Сохранить</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
