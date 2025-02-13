@@ -23,7 +23,7 @@ async def get_main_page(
     orders_response = Depends(get_all_orders)
 ):
     """Главная страница со списком всех заказов"""
-    print("Orders response:", orders_response)
+
     orders = orders_response.get("orders", [])
     return templates.TemplateResponse(
         "main.html",
