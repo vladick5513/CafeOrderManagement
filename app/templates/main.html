@@ -33,33 +33,44 @@
                 </tr>
             </thead>
             <tbody>
-                {% for order in orders %}
-                <tr>
-                    <td>{{ order.id }}</td>
-                    <td>{{ order.table_number }}</td>
-                    <td>
-                        {% if order.dishes %}
-                            <ul class="list-unstyled">
-                            {% for dish in order.dishes %}
-                                <li>{{ dish.name }} - {{ dish.price }} ₽</li>
-                            {% endfor %}
-                            </ul>
-                        {% endif %}
-                    </td>
-                    <td>{{ order.total_amount }} ₽</td>
-                    <td>{{ order.status }}</td>
-                    <td>
-                        <div class="btn-group">
-                            <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#statusModal{{ order.id }}">
-                                Изменить статус
+            {% for order in orders %}
+            <tr>
+                <td>{{ order.id }}</td>
+                <td>{{ order.table_number }}</td>
+                <td>
+                    {# Проверяем, является ли order.items словарем #}
+                    {% if order.items is mapping %}
+                    <ul class="list-unstyled">
+                        {% for name, price in order.items.items() %}
+                        <li>{{ name }} - {{ price }} ₽</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <span class="text-muted">Нет данных о блюдах</span>
+                    {% endif %}
+                </td>
+                <td>{{ order.total_price }} ₽</td>
+                <td>{{ order.status }}</td>
+                <td>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-warning btn-sm"
+                                data-bs-toggle="modal"
+                                data-bs-target="#statusModal{{ order.id }}">
+                            Изменить статус
+                        </button>
+                        <form action="/pages/orders/delete/{{ order.id }}"
+                              method="POST"
+                              style="display: inline;"
+                              onsubmit="return confirm('Вы уверены, что хотите удалить этот заказ?')">
+                            <button type="submit"
+                                    class="btn btn-danger btn-sm">
+                                Удалить
                             </button>
-                            <form action="/orders/delete/{{ order.id }}" method="POST" style="display: inline;">
-                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Удалить заказ?')">Удалить</button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
             </tbody>
         </table>
     </div>
@@ -74,7 +85,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form action="/orders/update_status/{{ order.id }}" method="POST">
+                    <form action="/pages/orders/update_status/{{ order.id }}" method="POST">
                         <select name="status" class="form-select">
                             <option value="в ожидании">В ожидании</option>
                             <option value="готово">Готово</option>
